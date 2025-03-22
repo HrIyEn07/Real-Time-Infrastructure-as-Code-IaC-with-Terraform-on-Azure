@@ -1,0 +1,54 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: Build
+    displayName: 'Build'
+    jobs:
+      - job: Build
+        displayName: 'Build'
+        steps:
+        - task: TerraformInstaller@1
+          inputs:
+            terraformVersion: 'latest'
+        - task: TerraformTaskV4@4
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            backendServiceArm: 'SC_Dev-to_AZURE-Resources'
+            backendAzureRmResourceGroupName: 'naresh-RG'
+            backendAzureRmStorageAccountName: 'teststoraccno01'
+            backendAzureRmContainerName: 'test-container-01'
+            backendAzureRmKey: 'terraform.tfstate'
+        - task: TerraformTaskV4@4
+          inputs:
+            provider: 'azurerm'
+            command: 'validate'
+            workingDirectory: '$(System.DefaultWorkingDirectory)/Real-Time-Infrastructure-as-Code-IaC-with-Terraform-on-Azure'
+
+        - task: TerraformTaskV4@4
+          inputs:
+            provider: 'azurerm'
+            command: 'plan'
+            workingDirectory: '$(System.DefaultWorkingDirectory)/Real-Time-Infrastructure-as-Code-IaC-with-Terraform-on-Azure'
+            environmentServiceNameAzureRM: 'SC_Dev-to_AZURE-Resources'
+        
+        - task: CopyFiles@2
+          inputs:
+            SourceFolder: '$(Build.SourcesDirectory)'
+            Contents: '**'
+            TargetFolder: '$(build.artifactstagingdirectory)'
+        
+        - task: PublishBuildArtifacts@1
+          inputs:
+            PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+            ArtifactName: 'naresh-artifacts'
+            publishLocation: 'Container'
