@@ -1,4 +1,5 @@
 variable "environment" {
+  description = "Environment-specific details (e.g., region, environment type)"
   type = object({
     name   = string
     type   = string  # dev, qa, staging, prod
@@ -9,68 +10,18 @@ variable "environment" {
   })
 }
 
-variable "common_resource_group" {
-  type = object({
-    name = string
-    location = string
-  })
-}
-
-
 variable "resource_group" {
     type = object({
       name = string
-      location = string
+      location   = string
     })
 }
-
-variable "region_name_mapper" {
-  type = map(string)
-  default = {
-    "eastus" = "eus"
-    "westus" = "wus"
-  }
-}
-
-variable "network_rg" {
-    type = object({
-      name = string
-      location  = string
-    })
-}
-
-
-variable "storage_accounts" {
-  type = map(object({
-    name              = string
-    tier              = string  # Standard or Premium
-    replication_type  = string  # LRS, GRS, ZRS, RAGRS, etc.
-    enable_failover   = bool
-    enable_backup     = bool
-    backup_retention  = optional(object({
-      frequency = string
-      time      = string
-    }))
-    containers = list(object({
-      name = string
-    }))
-  }))
-  description = "Configuration for storage accounts and associated containers"
-}
-
-variable "tags" {
-  type        = map(string)
-  description = "Common tags applied to all resources"
-}
-
-
-
-# variable "virtual-machine" {
-#   description = "List of VM definitions"
-#   type = list(object({
+######################
+# variable "virtual_machines" {
+#   description = "Map of virtual machine configurations"
+#   type = map(object({
 #     name                = string
 #     resource_group_name = string
-#     subnet_id           = string
 #     type                = string
 #     vm_size             = string
 #     disk_size_gb        = number
@@ -82,9 +33,51 @@ variable "tags" {
 #     })
 #     username = string
 #     password = string
+#     public_ip = object({
+#       enabled = bool
+#     })
 #   }))
 # }
 
+
+
+# variable "network" {
+#   description = "Network-related variables including VNet, Subnet, and NSG"
+#   type = object({
+#     vnet_name         = string
+#     subnet_name       = string
+#     subnet_id         = string
+#     nsg_name          = string
+#     nsg_rules         = list(object({
+#       name                       = string
+#       priority                   = number
+#       direction                  = string
+#       access                     = string
+#       protocol                   = string
+#       source_port_range          = string
+#       destination_port_range     = string
+#       source_address_prefix      = string
+#       destination_address_prefix = string
+#     }))
+#   })
+# }
+
+
+
+variable "tags" {
+  type        = map(string)
+  description = "Common tags applied to all resources"
+}
+
+
+
+variable "network_rg" {
+  description = "Resource group name and ID"
+  type = object({
+    name = string
+    location = string
+  })
+}
 
 variable "network" {
   description = "Network-related variables including VNet, Subnet, and NSG"
@@ -92,9 +85,9 @@ variable "network" {
     vnet_name        = string
     address_space    = list(string)
     subnet_name      = string
+    subnet_id = string
     address_prefixes = list(string)
     nsg_name         = string
-    created_network  = bool
     resource_group = object({
       name = string
       location = string

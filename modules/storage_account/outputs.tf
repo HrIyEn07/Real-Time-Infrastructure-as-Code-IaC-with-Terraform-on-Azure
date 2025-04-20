@@ -1,3 +1,11 @@
+# Output for resource group
+output "resource_group" {
+  value = var.resource_group.name != null ? {
+    name = azurerm_resource_group.strg[0].name
+    id   = azurerm_resource_group.strg[0].id
+  } : null
+}
+
 # Output for Storage Accounts
 output "storage_accounts" {
   description = "List of created storage accounts with their names and IDs"

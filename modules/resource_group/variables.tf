@@ -9,12 +9,13 @@ variable "environment" {
   })
 }
 
-variable "resource_group" {
-    type = object({
-      name = string
-      id   = string
-    })
+variable "common_resource_group" {
+  type = object({
+    name = string
+    location = string
+  })
 }
+
 
 variable "tags" {
   type        = map(string)

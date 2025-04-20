@@ -9,6 +9,6 @@ terraform {
 
 provider "azurerm" {
   features {}
-  #subscription_id = "enter your subscription id if required." 
+  #subscription_id = "" #"enter your subscription id if required." 
 }
 
