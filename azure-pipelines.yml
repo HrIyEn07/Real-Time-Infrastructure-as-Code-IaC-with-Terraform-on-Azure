@@ -8,7 +8,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 stages:
-  # Stage 1: Terraform Init
+  # Stage 1: Terraform Init (Module Installation)
   - stage: TerraformInit
     displayName: 'Terraform Init Stage'
     jobs:
@@ -21,12 +21,13 @@ stages:
             inputs:
               terraformVersion: 'latest'
           - task: TerraformTaskV4@4
-            displayName: 'Terraform Init'
+            displayName: 'Terraform Init (for module installation)'
             inputs:
               provider: 'azurerm'
               command: 'init'
               workingDirectory: '$(System.DefaultWorkingDirectory)/'
-              backendServiceArm: '$(serviceConnection)'
+              environmentServiceNameAzureRM: '$(serviceConnection)'  # Azure service connection for the resources
+              backendServiceArm: '$(serviceConnection)'  # Same service connection for the backend
               backendAzureRmResourceGroupName: '$(backendResourceGroup)'
               backendAzureRmStorageAccountName: '$(backendStorageAccount)'
               backendAzureRmContainerName: '$(backendContainer)'
@@ -35,7 +36,7 @@ stages:
   # Stage 2: Terraform Validate & Plan
   - stage: TerraformValidateAndPlan
     displayName: 'Terraform Validate & Plan Stage'
-    #dependsOn: TerraformInit
+    dependsOn: TerraformInit
     jobs:
       - job: ValidateAndPlan
         displayName: 'Terraform Validate & Plan Job'
@@ -45,16 +46,6 @@ stages:
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: 'latest'
-
-          # Run Terraform init to install modules before validate
-          - task: TerraformTaskV4@4
-            displayName: 'Terraform Init (for module installation)'
-            inputs:
-              provider: 'azurerm'
-              command: 'init'
-              workingDirectory: '$(System.DefaultWorkingDirectory)/'
-              environmentServiceNameAzureRM: '$(serviceConnection)'
-
           - task: TerraformTaskV4@4
             displayName: 'Terraform Validate'
             inputs:
@@ -62,7 +53,6 @@ stages:
               command: 'validate'
               workingDirectory: '$(System.DefaultWorkingDirectory)/'
               environmentServiceNameAzureRM: '$(serviceConnection)'
-
           - task: TerraformTaskV4@4
             displayName: 'Terraform Plan'
             inputs:
@@ -71,12 +61,9 @@ stages:
               workingDirectory: '$(System.DefaultWorkingDirectory)/'
               commandOptions: '-var-file=terraform.tfvars -out=tfplan.binary'
               environmentServiceNameAzureRM: '$(serviceConnection)'
-
-          - task: PublishPipelineArtifact@1
+          - publish: $(System.DefaultWorkingDirectory)
+            artifact: terraform-plan-$(Build.BuildId)
             displayName: 'Publish Terraform Plan Artifact'
-            inputs:
-              targetPath: '$(System.DefaultWorkingDirectory)'
-              artifact: 'artifact-$(Build.BuildId)'
 
   # Stage 3: Terraform Apply with Manual Approval
   - stage: TerraformApply
@@ -95,8 +82,15 @@ stages:
                   inputs:
                     terraformVersion: 'latest'
 
+                # Manual validation task for approval
+                # - task: ManualValidation@0
+                #   inputs:
+                #     notifyUsers: '["user1@example.com", "user2@example.com"]'  # Notify these users for approval
+                #     instructions: 'Please review the Terraform plan and approve to proceed with the apply step.'
+                #     timeoutInMinutes: 1440  # Timeout after 1 day (optional)
+                  
                 - download: current
-                  artifact: 'artifact-$(Build.BuildId)'
+                  artifact: terraform-plan-$(Build.BuildId)
                   displayName: 'Download Terraform Plan Artifact'
 
                 - task: TerraformTaskV4@4
@@ -104,6 +98,6 @@ stages:
                   inputs:
                     provider: 'azurerm'
                     command: 'apply'
-                    workingDirectory: '$(Pipeline.Workspace)/artifact-$(Build.BuildId)'
+                    workingDirectory: '$(Pipeline.Workspace)/terraform-plan-$(Build.BuildId)'
                     commandOptions: 'tfplan.binary'
                     environmentServiceNameAzureRM: '$(serviceConnection)'
