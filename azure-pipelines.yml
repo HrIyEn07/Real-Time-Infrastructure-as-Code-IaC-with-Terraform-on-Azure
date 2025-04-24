@@ -1,0 +1,49 @@
+trigger:
+- main
+
+variables:
+- group: TerraformBackendConfig  
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+- stage: TerraformDeployment
+  jobs:
+  - job: DeployTerraform
+    steps:
+    - checkout: self
+
+    - task: TerraformInstaller@1
+      displayName: 'Install Terraform'
+      inputs:
+        terraformVersion: 'latest'
+
+    - task: TerraformCLI@2
+      displayName: 'Terraform Init'
+      inputs:
+        command: 'init'
+        backendType: 'azurerm'  # Specify the backend type
+        backendServiceArm: '$(serviceConnection)'  # Azure RM Service Connection for authentication
+        backendAzureRmResourceGroupName: '$(backendResourceGroup)'  # Resource Group for backend storage
+        backendAzureRmStorageAccountName: '$(backendStorageAccount)'  # Storage account for the state file
+        backendAzureRmContainerName: '$(backendContainer)'  # Blob container for storing the state file
+        backendAzureRmKey: '$(backendStateFile)'  # State file name in the container
+        allowTelemetryCollection: true
+
+    - task: TerraformCLI@2
+      displayName: 'Terraform Plan'
+      inputs:
+        command: 'plan'
+        environmentServiceName: '$(serviceConnection)'
+        commandOptions: >
+          -var-file=$(tfVarsFile)
+        allowTelemetryCollection: true
+
+    - task: TerraformCLI@2
+      displayName: 'Terraform Apply'
+      inputs:
+        command: 'apply'
+        environmentServiceName: '$(serviceConnection)'
+        commandOptions: >
+          -var-file=$(tfVarsFile) -auto-approve
+        allowTelemetryCollection: true
