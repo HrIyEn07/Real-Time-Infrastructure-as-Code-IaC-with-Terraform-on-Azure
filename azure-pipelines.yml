@@ -10,7 +10,7 @@ pool:
 stages:
   # Stage 1: Terraform Init
   - stage: TerraformInit
-    displayName: 'Terraform Init'
+    displayName: 'Terraform Init Stage'
     jobs:
       - job: Init
         displayName: 'Terraform Init Job'
@@ -34,8 +34,8 @@ stages:
 
   # Stage 2: Terraform Validate & Plan
   - stage: TerraformValidateAndPlan
-    displayName: 'Terraform Validate & Plan'
-    dependsOn: TerraformInit
+    displayName: 'Terraform Validate & Plan Stage'
+    #dependsOn: TerraformInit
     jobs:
       - job: ValidateAndPlan
         displayName: 'Terraform Validate & Plan Job'
@@ -45,6 +45,15 @@ stages:
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: 'latest'
+
+          # Run Terraform init to install modules before validate
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Init (for module installation)'
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/'
+              environmentServiceNameAzureRM: '$(serviceConnection)'
 
           - task: TerraformTaskV4@4
             displayName: 'Terraform Validate'
@@ -71,7 +80,7 @@ stages:
 
   # Stage 3: Terraform Apply with Manual Approval
   - stage: TerraformApply
-    displayName: 'Terraform Apply'
+    displayName: 'Terraform Apply Stage'
     dependsOn: TerraformValidateAndPlan
     jobs:
       - deployment: Apply
@@ -87,7 +96,7 @@ stages:
                     terraformVersion: 'latest'
 
                 - download: current
-                  artifact: artifact-$(Build.BuildId)
+                  artifact: 'artifact-$(Build.BuildId)'
                   displayName: 'Download Terraform Plan Artifact'
 
                 - task: TerraformTaskV4@4
