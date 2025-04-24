@@ -10,7 +10,7 @@ pool:
 stages:
   # Stage 1: Terraform Init
   - stage: TerraformInit
-    displayName: 'Terraform Init Stage'
+    displayName: 'Terraform Init'
     jobs:
       - job: Init
         displayName: 'Terraform Init Job'
@@ -34,7 +34,7 @@ stages:
 
   # Stage 2: Terraform Validate & Plan
   - stage: TerraformValidateAndPlan
-    displayName: 'Terraform Validate & Plan Stage'
+    displayName: 'Terraform Validate & Plan'
     dependsOn: TerraformInit
     jobs:
       - job: ValidateAndPlan
@@ -63,13 +63,15 @@ stages:
               commandOptions: '-var-file=terraform.tfvars -out=tfplan.binary'
               environmentServiceNameAzureRM: '$(serviceConnection)'
 
-          - publish: $(System.DefaultWorkingDirectory)
-            artifact: terraform-plan-$(Build.BuildId)
+          - task: PublishPipelineArtifact@1
             displayName: 'Publish Terraform Plan Artifact'
+            inputs:
+              targetPath: '$(System.DefaultWorkingDirectory)'
+              artifact: 'artifact-$(Build.BuildId)'
 
   # Stage 3: Terraform Apply with Manual Approval
   - stage: TerraformApply
-    displayName: 'Terraform Apply Stage'
+    displayName: 'Terraform Apply'
     dependsOn: TerraformValidateAndPlan
     jobs:
       - deployment: Apply
@@ -85,7 +87,7 @@ stages:
                     terraformVersion: 'latest'
 
                 - download: current
-                  artifact: terraform-plan-$(Build.BuildId)
+                  artifact: artifact-$(Build.BuildId)
                   displayName: 'Download Terraform Plan Artifact'
 
                 - task: TerraformTaskV4@4
@@ -93,6 +95,6 @@ stages:
                   inputs:
                     provider: 'azurerm'
                     command: 'apply'
-                    workingDirectory: '$(Pipeline.Workspace)/terraform-plan-$(Build.BuildId)'
+                    workingDirectory: '$(Pipeline.Workspace)/artifact-$(Build.BuildId)'
                     commandOptions: 'tfplan.binary'
                     environmentServiceNameAzureRM: '$(serviceConnection)'
