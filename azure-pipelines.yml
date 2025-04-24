@@ -25,11 +25,11 @@ stages:
         provider: 'azurerm'
         command: 'init'
         workingDirectory: '$(System.DefaultWorkingDirectory)/'
-        backendServiceArm: 'Azure DevOps Pulse(18a0e420-4ca6-47f3-ba52-2534b3c7d2c1)'
-        backendAzureRmResourceGroupName: 'backend-rg'
-        backendAzureRmStorageAccountName: 'backendstorage011'
-        backendAzureRmContainerName: 'container-state'
-        backendAzureRmKey: 'terraform.tfstate'
+        backendServiceArm: '$(serviceConnection)'
+        backendAzureRmResourceGroupName: '$(backendResourceGroup)'
+        backendAzureRmStorageAccountName: '$(backendStorageAccount)'
+        backendAzureRmContainerName: '$(backendContainer)'
+        backendAzureRmKey: '$(backendStateFile)'
 
     - task: TerraformTaskV4@4
       displayName: 'Terraform Plan'
@@ -38,7 +38,7 @@ stages:
         command: 'plan'
         workingDirectory: '$(System.DefaultWorkingDirectory)/'
         commandOptions: '-var-file=terraform.tfvars'
-        environmentServiceNameAzureRM: 'Azure DevOps Pulse(18a0e420-4ca6-47f3-ba52-2534b3c7d2c1)'
+        environmentServiceNameAzureRM: '$(serviceConnection)'
 
     - task: TerraformTaskV4@4
       displayName: 'Terraform Apply'
@@ -47,4 +47,4 @@ stages:
         command: 'apply'
         workingDirectory: '$(System.DefaultWorkingDirectory)/'
         commandOptions: '-var-file=terraform.tfvars -auto-approve'
-        environmentServiceNameAzureRM: 'Azure DevOps Pulse(18a0e420-4ca6-47f3-ba52-2534b3c7d2c1)'
+        environmentServiceNameAzureRM: '$(serviceConnection)'
