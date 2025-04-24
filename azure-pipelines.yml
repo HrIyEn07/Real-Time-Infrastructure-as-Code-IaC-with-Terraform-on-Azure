@@ -65,7 +65,7 @@ stages:
             artifact: terraform-plan-$(Build.BuildId)
             displayName: 'Publish Terraform Plan Artifact'
 
-  # Stage 3: Terraform Apply with Manual Approval
+  # Stage 3: Terraform Apply (Manual Approval in Future)
   - stage: TerraformApply
     displayName: 'Terraform Apply Stage'
     dependsOn: TerraformValidateAndPlan
@@ -82,13 +82,13 @@ stages:
                   inputs:
                     terraformVersion: 'latest'
 
-                # Manual validation task for approval
+                # Manual validation task for approval (Currently Commented Out)
                 # - task: ManualValidation@0
                 #   inputs:
                 #     notifyUsers: '["user1@example.com", "user2@example.com"]'  # Notify these users for approval
                 #     instructions: 'Please review the Terraform plan and approve to proceed with the apply step.'
                 #     timeoutInMinutes: 1440  # Timeout after 1 day (optional)
-                  
+
                 - download: current
                   artifact: terraform-plan-$(Build.BuildId)
                   displayName: 'Download Terraform Plan Artifact'
