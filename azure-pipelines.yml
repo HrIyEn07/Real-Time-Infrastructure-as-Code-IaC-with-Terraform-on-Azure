@@ -2,7 +2,8 @@ trigger:
 - main
 
 variables:
-- group: TerraformBackendConfig  
+- group: TerraformBackendConfig  # Reference the variable group for backend variables
+
 pool:
   vmImage: 'ubuntu-latest'
 
@@ -18,32 +19,29 @@ stages:
       inputs:
         terraformVersion: 'latest'
 
-    - task: TerraformCLI@2
+    - task: TerraformTaskV4@4
       displayName: 'Terraform Init'
       inputs:
+        provider: 'azurerm'
         command: 'init'
-        backendType: 'azurerm'  # Specify the backend type
-        backendServiceArm: '$(serviceConnection)'  # Azure RM Service Connection for authentication
-        backendAzureRmResourceGroupName: '$(backendResourceGroup)'  # Resource Group for backend storage
-        backendAzureRmStorageAccountName: '$(backendStorageAccount)'  # Storage account for the state file
-        backendAzureRmContainerName: '$(backendContainer)'  # Blob container for storing the state file
-        backendAzureRmKey: '$(backendStateFile)'  # State file name in the container
-        allowTelemetryCollection: true
+        backendServiceArm: '$(serviceConnection)'
+        backendAzureRmResourceGroupName: '$(backendResourceGroup)'
+        backendAzureRmStorageAccountName: '$(backendStorageAccount)'
+        backendAzureRmContainerName: '$(backendContainer)'
+        backendAzureRmKey: '$(backendStateFile)'
 
-    - task: TerraformCLI@2
+    - task: TerraformTaskV4@4
       displayName: 'Terraform Plan'
       inputs:
+        provider: 'azurerm'
         command: 'plan'
-        environmentServiceName: '$(serviceConnection)'
-        commandOptions: >
-          -var-file=$(tfVarsFile)
-        allowTelemetryCollection: true
+        commandOptions: '-var-file=$(tfVarsFile)'
+        environmentServiceNameAzureRM: '$(serviceConnection)'
 
-    - task: TerraformCLI@2
+    - task: TerraformTaskV4@4
       displayName: 'Terraform Apply'
       inputs:
+        provider: 'azurerm'
         command: 'apply'
-        environmentServiceName: '$(serviceConnection)'
-        commandOptions: >
-          -var-file=$(tfVarsFile) -auto-approve
-        allowTelemetryCollection: true
+        commandOptions: '-var-file=$(tfVarsFile) -auto-approve'
+        environmentServiceNameAzureRM: '$(serviceConnection)'
