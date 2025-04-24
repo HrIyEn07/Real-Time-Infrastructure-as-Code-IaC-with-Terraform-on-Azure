@@ -37,7 +37,7 @@ stages:
         provider: 'azurerm'
         command: 'plan'
         workingDirectory: '$(System.DefaultWorkingDirectory)/'
-        commandOptions: '-var-file=$(terraform.tfvars)'
+        commandOptions: '-var-file=terraform.tfvars'
         environmentServiceNameAzureRM: 'Azure DevOps Pulse(18a0e420-4ca6-47f3-ba52-2534b3c7d2c1)'
 
     - task: TerraformTaskV4@4
@@ -46,5 +46,5 @@ stages:
         provider: 'azurerm'
         command: 'apply'
         workingDirectory: '$(System.DefaultWorkingDirectory)/'
-        commandOptions: '-var-file=$(terraform.tfvars) -auto-approve'
+        commandOptions: '-var-file=terraform.tfvars -auto-approve'
         environmentServiceNameAzureRM: 'Azure DevOps Pulse(18a0e420-4ca6-47f3-ba52-2534b3c7d2c1)'
