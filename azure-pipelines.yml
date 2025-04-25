@@ -2,28 +2,26 @@ trigger:
   - main
 
 variables:
-  - group: TerraformBackendConfig
+  - group: TerraformBackendConfig  # Your backend variables group
 
 pool:
-  name: default  # Use your self-hosted agent pool
+  name: default  # Self-hosted agent pool
 
 stages:
+  # Stage 1: Terraform Init
   - stage: TerraformInit
     displayName: 'Terraform Init Stage'
     jobs:
       - job: Init
         displayName: 'Terraform Init Job'
-        pool:
-          name: default
         steps:
           - checkout: self
           - task: TerraformInstaller@1
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: 'latest'
-
           - task: TerraformTaskV4@4
-            displayName: 'Terraform Init (for module installation)'
+            displayName: 'Terraform Init'
             inputs:
               provider: 'azurerm'
               command: 'init'
@@ -35,37 +33,15 @@ stages:
               backendAzureRmContainerName: '$(backendContainer)'
               backendAzureRmKey: '$(backendStateFile)'
 
-          - publish: $(System.DefaultWorkingDirectory)/.terraform
-            artifact: terraform-modules
-            displayName: 'Publish Terraform Modules Folder'
-
+  # Stage 2: Terraform Validate & Plan
   - stage: TerraformValidateAndPlan
     displayName: 'Terraform Validate & Plan Stage'
     dependsOn: TerraformInit
     jobs:
       - job: ValidateAndPlan
         displayName: 'Terraform Validate & Plan Job'
-        pool:
-          name: default
         steps:
           - checkout: self
-
-          - download: current
-            artifact: terraform-modules
-            displayName: 'Download Terraform Modules Folder'
-
-          - script: |
-              echo "Restoring .terraform modules folder"
-              mkdir -p .terraform
-              cp -r $(Pipeline.Workspace)/terraform-modules/* .terraform/
-            workingDirectory: '$(System.DefaultWorkingDirectory)/'
-            displayName: 'Restore Terraform Modules'
-
-          - task: TerraformInstaller@1
-            displayName: 'Install Terraform'
-            inputs:
-              terraformVersion: 'latest'
-
           - task: TerraformTaskV4@4
             displayName: 'Terraform Validate'
             inputs:
@@ -73,7 +49,6 @@ stages:
               command: 'validate'
               workingDirectory: '$(System.DefaultWorkingDirectory)/'
               environmentServiceNameAzureRM: '$(serviceConnection)'
-
           - task: TerraformTaskV4@4
             displayName: 'Terraform Plan'
             inputs:
@@ -82,36 +57,24 @@ stages:
               workingDirectory: '$(System.DefaultWorkingDirectory)/'
               commandOptions: '-var-file=terraform.tfvars -out=tfplan.binary'
               environmentServiceNameAzureRM: '$(serviceConnection)'
-
           - publish: $(System.DefaultWorkingDirectory)
             artifact: terraform-plan-$(Build.BuildId)
             displayName: 'Publish Terraform Plan Artifact'
 
+  # Stage 3: Terraform Apply (With UI Approval in Dev Environment)
   - stage: TerraformApply
     displayName: 'Terraform Apply Stage'
     dependsOn: TerraformValidateAndPlan
     jobs:
       - deployment: Apply
         displayName: 'Terraform Apply Deployment'
-        environment: 'dev'
+        environment: 'dev'  # Set manual approval from Azure DevOps UI > Environments
         pool:
           name: default
         strategy:
           runOnce:
             deploy:
               steps:
-                - task: TerraformInstaller@1
-                  displayName: 'Install Terraform'
-                  inputs:
-                    terraformVersion: 'latest'
-
-                # Uncomment this for manual approval later
-                # - task: ManualValidation@0
-                #   inputs:
-                #     notifyUsers: '["devopslead@example.com"]'
-                #     instructions: 'Review and approve before applying.'
-                #     timeoutInMinutes: 1440
-
                 - download: current
                   artifact: terraform-plan-$(Build.BuildId)
                   displayName: 'Download Terraform Plan Artifact'
