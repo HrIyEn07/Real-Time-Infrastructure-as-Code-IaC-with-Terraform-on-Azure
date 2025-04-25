@@ -1,60 +1,106 @@
 trigger:
-- main
+  - main
 
 variables:
-- group: TerraformBackendConfig  # Reference the variable group for backend variables
+  - group: TerraformBackendConfig  # Backend config variable group
 
 pool:
-  vmImage: 'ubuntu-latest'
+  name: default  # <-- Using self-hosted agent pool named 'default'
 
 stages:
-- stage: TerraformDeployment
-  jobs:
-  - job: DeployTerraform
-    steps:
-    - checkout: self
+  - stage: TerraformInit
+    displayName: 'Terraform Init Stage'
+    jobs:
+      - job: Init
+        displayName: 'Terraform Init Job'
+        pool:
+          name: default  # <-- Ensures self-hosted agent is used here
+        steps:
+          - checkout: self
+          - task: TerraformInstaller@1
+            displayName: 'Install Terraform'
+            inputs:
+              terraformVersion: 'latest'
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Init'
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/'
+              environmentServiceNameAzureRM: '$(serviceConnection)'
+              backendServiceArm: '$(serviceConnection)'
+              backendAzureRmResourceGroupName: '$(backendResourceGroup)'
+              backendAzureRmStorageAccountName: '$(backendStorageAccount)'
+              backendAzureRmContainerName: '$(backendContainer)'
+              backendAzureRmKey: '$(backendStateFile)'
 
-    - task: TerraformInstaller@1
-      displayName: 'Install Terraform'
-      inputs:
-        terraformVersion: 'latest'
+  - stage: TerraformValidateAndPlan
+    displayName: 'Terraform Validate & Plan Stage'
+    dependsOn: TerraformInit
+    jobs:
+      - job: ValidateAndPlan
+        displayName: 'Terraform Validate & Plan Job'
+        pool:
+          name: default
+        steps:
+          - checkout: self
+          - task: TerraformInstaller@1
+            displayName: 'Install Terraform'
+            inputs:
+              terraformVersion: 'latest'
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Validate'
+            inputs:
+              provider: 'azurerm'
+              command: 'validate'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/'
+              environmentServiceNameAzureRM: '$(serviceConnection)'
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Plan'
+            inputs:
+              provider: 'azurerm'
+              command: 'plan'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/'
+              commandOptions: '-var-file=terraform.tfvars -out=tfplan.binary'
+              environmentServiceNameAzureRM: '$(serviceConnection)'
+          - publish: $(System.DefaultWorkingDirectory)
+            artifact: terraform-plan-$(Build.BuildId)
+            displayName: 'Publish Terraform Plan Artifact'
 
-    - task: TerraformTaskV4@4
-      displayName: 'Terraform Init'
-      inputs:
-        provider: 'azurerm'
-        command: 'init'
-        workingDirectory: '$(System.DefaultWorkingDirectory)/'
-        backendServiceArm: '$(serviceConnection)'
-        backendAzureRmResourceGroupName: '$(backendResourceGroup)'
-        backendAzureRmStorageAccountName: '$(backendStorageAccount)'
-        backendAzureRmContainerName: '$(backendContainer)'
-        backendAzureRmKey: '$(backendStateFile)'
+  - stage: TerraformApply
+    displayName: 'Terraform Apply Stage'
+    dependsOn: TerraformValidateAndPlan
+    jobs:
+      - deployment: Apply
+        displayName: 'Terraform Apply Deployment'
+        environment: 'dev'
+        pool:
+          name: default
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: TerraformInstaller@1
+                  displayName: 'Install Terraform'
+                  inputs:
+                    terraformVersion: 'latest'
 
-    - task: TerraformTaskV4@4
-      displayName: 'Terraform Plan'
-      inputs:
-        provider: 'azurerm'
-        command: 'plan'
-        workingDirectory: '$(System.DefaultWorkingDirectory)/'
-        commandOptions: '-var-file=terraform.tfvars'
-        environmentServiceNameAzureRM: '$(serviceConnection)'
+                # ManualValidation is ready for later use
+                # - task: ManualValidation@0
+                #   inputs:
+                #     notifyUsers: '["devopslead@example.com"]'
+                #     instructions: 'Review and approve before applying.'
+                #     timeoutInMinutes: 1440
 
-- stage: TerraformApply
-  dependsOn: TerraformDeployment
-  jobs:
-  - job: ApplyTerraform
-    steps:
-    # - task: ManualValidation@0
-    #   inputs:
-    #     notifyUsers: '["user1@example.com", "user2@example.com"]'  # Optional: Add users for notification
-    #     instructions: 'Please review the Terraform plan and approve to proceed with the apply step.'
+                - download: current
+                  artifact: terraform-plan-$(Build.BuildId)
+                  displayName: 'Download Terraform Plan Artifact'
 
-    - task: TerraformTaskV4@4
-      displayName: 'Terraform Apply'
-      inputs:
-        provider: 'azurerm'
-        command: 'apply'
-        workingDirectory: '$(System.DefaultWorkingDirectory)/'
-        commandOptions: '-var-file=terraform.tfvars -auto-approve'
-        environmentServiceNameAzureRM: '$(serviceConnection)'
+                - task: TerraformTaskV4@4
+                  displayName: 'Terraform Apply'
+                  inputs:
+                    provider: 'azurerm'
+                    command: 'apply'
+                    workingDirectory: '$(Pipeline.Workspace)/terraform-plan-$(Build.BuildId)'
+                    commandOptions: 'tfplan.binary'
+                    environmentServiceNameAzureRM: '$(serviceConnection)'
