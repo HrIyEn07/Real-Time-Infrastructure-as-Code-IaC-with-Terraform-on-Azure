@@ -2,13 +2,13 @@ trigger:
   - main
 
 variables:
-  - group: TerraformBackendConfig
+  - group: TerraformBackendConfig  # Your backend variables group
 
 pool:
-  vmImage: 'ubuntu-latest'
+  name: 'default'
 
 stages:
-  # STAGE 1: Terraform Init (with backend) & publish modules/providers
+  # Stage 1: Terraform Init (Module Installation)
   - stage: TerraformInit
     displayName: 'Terraform Init Stage'
     jobs:
@@ -16,114 +16,82 @@ stages:
         displayName: 'Terraform Init Job'
         steps:
           - checkout: self
-
           - task: TerraformInstaller@1
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: 'latest'
-
           - task: TerraformTaskV4@4
-            displayName: 'Terraform Init (with backend)'
+            displayName: 'Terraform Init (for module installation)'
             inputs:
               provider: 'azurerm'
               command: 'init'
-              workingDirectory: '$(System.DefaultWorkingDirectory)'
-              backendServiceArm: '$(serviceConnection)'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/'
+              environmentServiceNameAzureRM: '$(serviceConnection)'  # Azure service connection for the resources
+              backendServiceArm: '$(serviceConnection)'  # Same service connection for the backend
               backendAzureRmResourceGroupName: '$(backendResourceGroup)'
               backendAzureRmStorageAccountName: '$(backendStorageAccount)'
               backendAzureRmContainerName: '$(backendContainer)'
               backendAzureRmKey: '$(backendStateFile)'
 
-          - publish: $(System.DefaultWorkingDirectory)/.terraform
-            artifact: terraform-init-dir
-            displayName: 'Publish .terraform folder'
-
-          - publish: $(System.DefaultWorkingDirectory)/.terraform.lock.hcl
-            artifact: terraform-lock
-            displayName: 'Publish lock file'
-
-  # STAGE 2: Validate & Plan (restore modules)
+  # Stage 2: Terraform Validate & Plan
   - stage: TerraformValidateAndPlan
-    displayName: 'Terraform Validate & Plan'
+    displayName: 'Terraform Validate & Plan Stage'
     dependsOn: TerraformInit
     jobs:
       - job: ValidateAndPlan
         displayName: 'Terraform Validate & Plan Job'
         steps:
           - checkout: self
-
           - task: TerraformInstaller@1
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: 'latest'
-
-          - download: current
-            artifact: terraform-init-dir
-
-          - download: current
-            artifact: terraform-lock
-
-          - script: |
-              mkdir -p .terraform
-              cp -r $(Pipeline.Workspace)/terraform-init-dir/* .terraform/
-              cp $(Pipeline.Workspace)/terraform-lock/terraform.lock.hcl .
-            displayName: 'Restore Terraform .terraform directory and lock file'
-
           - task: TerraformTaskV4@4
             displayName: 'Terraform Validate'
             inputs:
               provider: 'azurerm'
               command: 'validate'
-              workingDirectory: '$(System.DefaultWorkingDirectory)'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/'
               environmentServiceNameAzureRM: '$(serviceConnection)'
-
           - task: TerraformTaskV4@4
             displayName: 'Terraform Plan'
             inputs:
               provider: 'azurerm'
               command: 'plan'
-              workingDirectory: '$(System.DefaultWorkingDirectory)'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/'
               commandOptions: '-var-file=terraform.tfvars -out=tfplan.binary'
               environmentServiceNameAzureRM: '$(serviceConnection)'
-
           - publish: $(System.DefaultWorkingDirectory)
             artifact: terraform-plan-$(Build.BuildId)
             displayName: 'Publish Terraform Plan Artifact'
 
-  # STAGE 3: Terraform Apply (re-init with backend for state safety)
+  # Stage 3: Terraform Apply (Manual Approval in Future)
   - stage: TerraformApply
     displayName: 'Terraform Apply Stage'
     dependsOn: TerraformValidateAndPlan
     jobs:
       - deployment: Apply
         displayName: 'Terraform Apply Deployment'
-        environment: 'dev'
+        environment: 'dev'  # Define this environment in Azure DevOps UI
         strategy:
           runOnce:
             deploy:
               steps:
-                - checkout: self
-
                 - task: TerraformInstaller@1
                   displayName: 'Install Terraform'
                   inputs:
                     terraformVersion: 'latest'
 
+                # Manual validation task for approval (Currently Commented Out)
+                # - task: ManualValidation@0
+                #   inputs:
+                #     notifyUsers: '["user1@example.com", "user2@example.com"]'  # Notify these users for approval
+                #     instructions: 'Please review the Terraform plan and approve to proceed with the apply step.'
+                #     timeoutInMinutes: 1440  # Timeout after 1 day (optional)
+
                 - download: current
                   artifact: terraform-plan-$(Build.BuildId)
-
-                # RE-RUN INIT to ensure backend is configured for apply
-                - task: TerraformTaskV4@4
-                  displayName: 'Terraform Init (for backend state)'
-                  inputs:
-                    provider: 'azurerm'
-                    command: 'init'
-                    workingDirectory: '$(Pipeline.Workspace)/terraform-plan-$(Build.BuildId)'
-                    backendServiceArm: '$(serviceConnection)'
-                    backendAzureRmResourceGroupName: '$(backendResourceGroup)'
-                    backendAzureRmStorageAccountName: '$(backendStorageAccount)'
-                    backendAzureRmContainerName: '$(backendContainer)'
-                    backendAzureRmKey: '$(backendStateFile)'
+                  displayName: 'Download Terraform Plan Artifact'
 
                 - task: TerraformTaskV4@4
                   displayName: 'Terraform Apply'
