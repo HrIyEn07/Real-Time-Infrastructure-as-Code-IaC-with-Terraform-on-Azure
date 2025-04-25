@@ -2,13 +2,14 @@ trigger:
   - main
 
 variables:
-  - group: TerraformBackendConfig  # Your backend variables group
+  - group: TerraformBackendConfig  # Backend config stored in variable group
 
 pool:
   vmImage: 'ubuntu-latest'
 
 stages:
-  # Stage 1: Terraform Init (Module Installation)
+
+  # Stage 1: Terraform Init
   - stage: TerraformInit
     displayName: 'Terraform Init Stage'
     jobs:
@@ -16,22 +17,28 @@ stages:
         displayName: 'Terraform Init Job'
         steps:
           - checkout: self
+          
           - task: TerraformInstaller@1
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: 'latest'
+
           - task: TerraformTaskV4@4
-            displayName: 'Terraform Init (for module installation)'
+            displayName: 'Terraform Init (Install Modules)'
             inputs:
               provider: 'azurerm'
               command: 'init'
               workingDirectory: '$(System.DefaultWorkingDirectory)/'
-              environmentServiceNameAzureRM: '$(serviceConnection)'  # Azure service connection for the resources
-              backendServiceArm: '$(serviceConnection)'  # Same service connection for the backend
+              environmentServiceNameAzureRM: '$(serviceConnection)'
+              backendServiceArm: '$(serviceConnection)'
               backendAzureRmResourceGroupName: '$(backendResourceGroup)'
               backendAzureRmStorageAccountName: '$(backendStorageAccount)'
               backendAzureRmContainerName: '$(backendContainer)'
               backendAzureRmKey: '$(backendStateFile)'
+
+          - publish: $(System.DefaultWorkingDirectory)/.terraform
+            artifact: terraform-modules
+            displayName: 'Publish Terraform Modules'
 
   # Stage 2: Terraform Validate & Plan
   - stage: TerraformValidateAndPlan
@@ -42,10 +49,20 @@ stages:
         displayName: 'Terraform Validate & Plan Job'
         steps:
           - checkout: self
+
+          - download: current
+            artifact: terraform-modules
+            displayName: 'Download Terraform Modules Artifact'
+
+          - script: |
+              cp -r $(Pipeline.Workspace)/terraform-modules $(System.DefaultWorkingDirectory)/.terraform
+            displayName: 'Restore Terraform Modules'
+
           - task: TerraformInstaller@1
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: 'latest'
+
           - task: TerraformTaskV4@4
             displayName: 'Terraform Validate'
             inputs:
@@ -53,6 +70,7 @@ stages:
               command: 'validate'
               workingDirectory: '$(System.DefaultWorkingDirectory)/'
               environmentServiceNameAzureRM: '$(serviceConnection)'
+
           - task: TerraformTaskV4@4
             displayName: 'Terraform Plan'
             inputs:
@@ -61,18 +79,19 @@ stages:
               workingDirectory: '$(System.DefaultWorkingDirectory)/'
               commandOptions: '-var-file=terraform.tfvars -out=tfplan.binary'
               environmentServiceNameAzureRM: '$(serviceConnection)'
+
           - publish: $(System.DefaultWorkingDirectory)
             artifact: terraform-plan-$(Build.BuildId)
             displayName: 'Publish Terraform Plan Artifact'
 
-  # Stage 3: Terraform Apply (Manual Approval in Future)
+  # Stage 3: Terraform Apply (Manual approval can be added later)
   - stage: TerraformApply
     displayName: 'Terraform Apply Stage'
     dependsOn: TerraformValidateAndPlan
     jobs:
       - deployment: Apply
         displayName: 'Terraform Apply Deployment'
-        environment: 'dev'  # Define this environment in Azure DevOps UI
+        environment: 'dev'  # Define this in Azure DevOps Environments
         strategy:
           runOnce:
             deploy:
@@ -82,12 +101,12 @@ stages:
                   inputs:
                     terraformVersion: 'latest'
 
-                # Manual validation task for approval (Currently Commented Out)
+                # Optional: Add approval step before apply
                 # - task: ManualValidation@0
                 #   inputs:
-                #     notifyUsers: '["user1@example.com", "user2@example.com"]'  # Notify these users for approval
-                #     instructions: 'Please review the Terraform plan and approve to proceed with the apply step.'
-                #     timeoutInMinutes: 1440  # Timeout after 1 day (optional)
+                #     notifyUsers: '["youruser@example.com"]'
+                #     instructions: 'Review plan and approve to apply'
+                #     timeoutInMinutes: 1440
 
                 - download: current
                   artifact: terraform-plan-$(Build.BuildId)
