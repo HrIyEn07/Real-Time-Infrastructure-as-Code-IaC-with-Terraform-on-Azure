@@ -1,5 +1,5 @@
 variables:
-- group: TerraformBackendConfig-dev
+- group: TerraformBackendConfig
 
 # These variables are consistent across all environments but scoped by parameter
 - name: tfAction

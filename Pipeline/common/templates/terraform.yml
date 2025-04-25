@@ -16,7 +16,7 @@ jobs:
       inputs:
         provider: 'azurerm'
         command: 'init'
-        backendServiceArm: $(serviceConnection)
+        environmentServiceNameAzureRM: 'Azure DevOps Pulse(18a0e420-4ca6-47f3-ba52-2534b3c7d2c1)'
         backendAzureRmResourceGroupName: $(backendAzureRmResourceGroupName)
         backendAzureRmStorageAccountName: $(backendAzureRmStorageAccountName)
         backendAzureRmContainerName: $(backendAzureRmContainerName)
@@ -28,7 +28,7 @@ jobs:
           inputs:
             provider: 'azurerm'
             command: 'validate'
-            environmentServiceNameAzureRM: $(serviceConnection)
+            environmentServiceNameAzureRM: 'Azure DevOps Pulse(18a0e420-4ca6-47f3-ba52-2534b3c7d2c1)'
 
     # Conditional Plan Step
     - ${{ if eq(parameters.tfAction, 'plan') }}:
@@ -36,7 +36,7 @@ jobs:
           inputs:
             provider: 'azurerm'
             command: 'plan'
-            environmentServiceNameAzureRM: $(serviceConnection)
+            environmentServiceNameAzureRM: 'Azure DevOps Pulse(18a0e420-4ca6-47f3-ba52-2534b3c7d2c1)'
             vars: |
               -var-file=$(tfvarsFile)
 
@@ -46,7 +46,7 @@ jobs:
           inputs:
             provider: 'azurerm'
             command: 'apply'
-            environmentServiceNameAzureRM: $(serviceConnection)
+            environmentServiceNameAzureRM: 'Azure DevOps Pulse(18a0e420-4ca6-47f3-ba52-2534b3c7d2c1)'
             vars: |
               -var-file=$(tfvarsFile)
             ensureBackend: true
@@ -58,7 +58,7 @@ jobs:
           inputs:
             provider: 'azurerm'
             command: 'destroy'
-            environmentServiceNameAzureRM: $(serviceConnection)
+            environmentServiceNameAzureRM: 'Azure DevOps Pulse(18a0e420-4ca6-47f3-ba52-2534b3c7d2c1)'
             vars: |
               -var-file=$(tfvarsFile)
             ensureBackend: true
