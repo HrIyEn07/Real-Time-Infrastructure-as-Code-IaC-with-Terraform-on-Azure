@@ -2,10 +2,10 @@ trigger:
   - main
 
 variables:
-  - group: TerraformBackendConfig  # Backend config variable group
+  - group: TerraformBackendConfig
 
 pool:
-  name: default  # <-- Using self-hosted agent pool named 'default'
+  name: default  # Use your self-hosted agent pool
 
 stages:
   - stage: TerraformInit
@@ -14,15 +14,16 @@ stages:
       - job: Init
         displayName: 'Terraform Init Job'
         pool:
-          name: default  # <-- Ensures self-hosted agent is used here
+          name: default
         steps:
           - checkout: self
           - task: TerraformInstaller@1
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: 'latest'
+
           - task: TerraformTaskV4@4
-            displayName: 'Terraform Init'
+            displayName: 'Terraform Init (for module installation)'
             inputs:
               provider: 'azurerm'
               command: 'init'
@@ -34,6 +35,10 @@ stages:
               backendAzureRmContainerName: '$(backendContainer)'
               backendAzureRmKey: '$(backendStateFile)'
 
+          - publish: $(System.DefaultWorkingDirectory)/.terraform
+            artifact: terraform-modules
+            displayName: 'Publish Terraform Modules Folder'
+
   - stage: TerraformValidateAndPlan
     displayName: 'Terraform Validate & Plan Stage'
     dependsOn: TerraformInit
@@ -44,10 +49,23 @@ stages:
           name: default
         steps:
           - checkout: self
+
+          - download: current
+            artifact: terraform-modules
+            displayName: 'Download Terraform Modules Folder'
+
+          - script: |
+              echo "Restoring .terraform modules folder"
+              mkdir -p .terraform
+              cp -r $(Pipeline.Workspace)/terraform-modules/* .terraform/
+            workingDirectory: '$(System.DefaultWorkingDirectory)/'
+            displayName: 'Restore Terraform Modules'
+
           - task: TerraformInstaller@1
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: 'latest'
+
           - task: TerraformTaskV4@4
             displayName: 'Terraform Validate'
             inputs:
@@ -55,6 +73,7 @@ stages:
               command: 'validate'
               workingDirectory: '$(System.DefaultWorkingDirectory)/'
               environmentServiceNameAzureRM: '$(serviceConnection)'
+
           - task: TerraformTaskV4@4
             displayName: 'Terraform Plan'
             inputs:
@@ -63,6 +82,7 @@ stages:
               workingDirectory: '$(System.DefaultWorkingDirectory)/'
               commandOptions: '-var-file=terraform.tfvars -out=tfplan.binary'
               environmentServiceNameAzureRM: '$(serviceConnection)'
+
           - publish: $(System.DefaultWorkingDirectory)
             artifact: terraform-plan-$(Build.BuildId)
             displayName: 'Publish Terraform Plan Artifact'
@@ -85,7 +105,7 @@ stages:
                   inputs:
                     terraformVersion: 'latest'
 
-                # ManualValidation is ready for later use
+                # Uncomment this for manual approval later
                 # - task: ManualValidation@0
                 #   inputs:
                 #     notifyUsers: '["devopslead@example.com"]'
