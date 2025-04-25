@@ -2,13 +2,13 @@ trigger:
   - main
 
 variables:
-  - group: TerraformBackendConfig  # Variable group containing serviceConnection, backendResourceGroup, etc.
+  - group: TerraformBackendConfig
 
 pool:
   vmImage: 'ubuntu-latest'
 
 stages:
-  # Stage 1: Terraform Init (Module + Provider Setup)
+  # STAGE 1: Terraform Init (with backend) & publish modules/providers
   - stage: TerraformInit
     displayName: 'Terraform Init Stage'
     jobs:
@@ -23,21 +23,28 @@ stages:
               terraformVersion: 'latest'
 
           - task: TerraformTaskV4@4
-            displayName: 'Terraform Init'
+            displayName: 'Terraform Init (with backend)'
             inputs:
               provider: 'azurerm'
               command: 'init'
-              workingDirectory: '$(System.DefaultWorkingDirectory)/'
-              environmentServiceNameAzureRM: '$(serviceConnection)'
+              workingDirectory: '$(System.DefaultWorkingDirectory)'
               backendServiceArm: '$(serviceConnection)'
               backendAzureRmResourceGroupName: '$(backendResourceGroup)'
               backendAzureRmStorageAccountName: '$(backendStorageAccount)'
               backendAzureRmContainerName: '$(backendContainer)'
               backendAzureRmKey: '$(backendStateFile)'
 
-  # Stage 2: Terraform Validate & Plan
+          - publish: $(System.DefaultWorkingDirectory)/.terraform
+            artifact: terraform-init-dir
+            displayName: 'Publish .terraform folder'
+
+          - publish: $(System.DefaultWorkingDirectory)/.terraform.lock.hcl
+            artifact: terraform-lock
+            displayName: 'Publish lock file'
+
+  # STAGE 2: Validate & Plan (restore modules)
   - stage: TerraformValidateAndPlan
-    displayName: 'Terraform Validate & Plan Stage'
+    displayName: 'Terraform Validate & Plan'
     dependsOn: TerraformInit
     jobs:
       - job: ValidateAndPlan
@@ -50,12 +57,24 @@ stages:
             inputs:
               terraformVersion: 'latest'
 
+          - download: current
+            artifact: terraform-init-dir
+
+          - download: current
+            artifact: terraform-lock
+
+          - script: |
+              mkdir -p .terraform
+              cp -r $(Pipeline.Workspace)/terraform-init-dir/* .terraform/
+              cp $(Pipeline.Workspace)/terraform-lock/terraform.lock.hcl .
+            displayName: 'Restore Terraform .terraform directory and lock file'
+
           - task: TerraformTaskV4@4
             displayName: 'Terraform Validate'
             inputs:
               provider: 'azurerm'
               command: 'validate'
-              workingDirectory: '$(System.DefaultWorkingDirectory)/'
+              workingDirectory: '$(System.DefaultWorkingDirectory)'
               environmentServiceNameAzureRM: '$(serviceConnection)'
 
           - task: TerraformTaskV4@4
@@ -63,7 +82,7 @@ stages:
             inputs:
               provider: 'azurerm'
               command: 'plan'
-              workingDirectory: '$(System.DefaultWorkingDirectory)/'
+              workingDirectory: '$(System.DefaultWorkingDirectory)'
               commandOptions: '-var-file=terraform.tfvars -out=tfplan.binary'
               environmentServiceNameAzureRM: '$(serviceConnection)'
 
@@ -71,7 +90,7 @@ stages:
             artifact: terraform-plan-$(Build.BuildId)
             displayName: 'Publish Terraform Plan Artifact'
 
-  # Stage 3: Terraform Apply (with Init for provider permissions)
+  # STAGE 3: Terraform Apply (re-init with backend for state safety)
   - stage: TerraformApply
     displayName: 'Terraform Apply Stage'
     dependsOn: TerraformValidateAndPlan
@@ -92,15 +111,14 @@ stages:
 
                 - download: current
                   artifact: terraform-plan-$(Build.BuildId)
-                  displayName: 'Download Terraform Plan Artifact'
 
+                # RE-RUN INIT to ensure backend is configured for apply
                 - task: TerraformTaskV4@4
-                  displayName: 'Terraform Init (Reinitialize for Apply)'
+                  displayName: 'Terraform Init (for backend state)'
                   inputs:
                     provider: 'azurerm'
                     command: 'init'
-                    workingDirectory: '$(System.DefaultWorkingDirectory)/'
-                    environmentServiceNameAzureRM: '$(serviceConnection)'
+                    workingDirectory: '$(Pipeline.Workspace)/terraform-plan-$(Build.BuildId)'
                     backendServiceArm: '$(serviceConnection)'
                     backendAzureRmResourceGroupName: '$(backendResourceGroup)'
                     backendAzureRmStorageAccountName: '$(backendStorageAccount)'
@@ -112,6 +130,6 @@ stages:
                   inputs:
                     provider: 'azurerm'
                     command: 'apply'
-                    workingDirectory: '$(System.DefaultWorkingDirectory)/'
+                    workingDirectory: '$(Pipeline.Workspace)/terraform-plan-$(Build.BuildId)'
                     commandOptions: 'tfplan.binary'
                     environmentServiceNameAzureRM: '$(serviceConnection)'
