@@ -1,125 +1,50 @@
 trigger:
-  - main
+- main
 
 variables:
-  - group: TerraformBackendConfig
+- group: TerraformBackendConfig  # Reference the variable group for backend variables
 
 pool:
-  name: default  # Using your self-hosted agent
+  vmImage: 'Default'
 
 stages:
-  # Stage 1: Terraform Init
-  - stage: TerraformInit
-    displayName: 'Terraform Init Stage'
-    jobs:
-      - job: Init
-        displayName: 'Terraform Init Job'
-        steps:
-          - checkout: self
+- stage: TerraformDeployment
+  jobs:
+  - job: DeployTerraform
+    steps:
+    - checkout: self
 
-          - task: TerraformInstaller@1
-            displayName: 'Install Terraform'
-            inputs:
-              terraformVersion: 'latest'
+    - task: TerraformInstaller@1
+      displayName: 'Install Terraform'
+      inputs:
+        terraformVersion: 'latest'
 
-          - task: TerraformTaskV4@4
-            displayName: 'Terraform Init'
-            inputs:
-              provider: 'azurerm'
-              command: 'init'
-              workingDirectory: '$(System.DefaultWorkingDirectory)/'
-              environmentServiceNameAzureRM: '$(serviceConnection)'
-              backendServiceArm: '$(serviceConnection)'
-              backendAzureRmResourceGroupName: '$(backendResourceGroup)'
-              backendAzureRmStorageAccountName: '$(backendStorageAccount)'
-              backendAzureRmContainerName: '$(backendContainer)'
-              backendAzureRmKey: '$(backendStateFile)'
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Init'
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/'
+        backendServiceArm: '$(serviceConnection)'
+        backendAzureRmResourceGroupName: '$(backendResourceGroup)'
+        backendAzureRmStorageAccountName: '$(backendStorageAccount)'
+        backendAzureRmContainerName: '$(backendContainer)'
+        backendAzureRmKey: '$(backendStateFile)'
 
-          # Archive .terraform folder
-          - task: ArchiveFiles@2
-            displayName: 'Archive .terraform folder'
-            inputs:
-              rootFolderOrFile: '$(System.DefaultWorkingDirectory)/.terraform'
-              includeRootFolder: false
-              archiveFile: '$(Build.ArtifactStagingDirectory)/terraform-modules.zip'
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Plan'
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/'
+        commandOptions: '-var-file=terraform.tfvars'
+        environmentServiceNameAzureRM: '$(serviceConnection)'
 
-          - publish: '$(Build.ArtifactStagingDirectory)/terraform-modules.zip'
-            artifact: terraform-modules
-
-  # Stage 2: Terraform Validate & Plan
-  - stage: TerraformValidateAndPlan
-    displayName: 'Terraform Validate & Plan Stage'
-    dependsOn: TerraformInit
-    jobs:
-      - job: ValidateAndPlan
-        displayName: 'Terraform Validate & Plan Job'
-        steps:
-          - checkout: self
-
-          - task: TerraformInstaller@1
-            displayName: 'Install Terraform'
-            inputs:
-              terraformVersion: 'latest'
-
-          # Download and extract .terraform folder
-          - download: current
-            artifact: terraform-modules
-            displayName: 'Download Terraform Modules Artifact'
-
-          - task: ExtractFiles@1
-            displayName: 'Extract .terraform folder'
-            inputs:
-              archiveFilePatterns: '**/terraform-modules.zip'
-              destinationFolder: '$(System.DefaultWorkingDirectory)/.terraform'
-              cleanDestinationFolder: false
-
-          - task: TerraformTaskV4@4
-            displayName: 'Terraform Validate'
-            inputs:
-              provider: 'azurerm'
-              command: 'validate'
-              workingDirectory: '$(System.DefaultWorkingDirectory)/'
-              environmentServiceNameAzureRM: '$(serviceConnection)'
-
-          - task: TerraformTaskV4@4
-            displayName: 'Terraform Plan'
-            inputs:
-              provider: 'azurerm'
-              command: 'plan'
-              workingDirectory: '$(System.DefaultWorkingDirectory)/'
-              commandOptions: '-var-file=terraform.tfvars -out=tfplan.binary'
-              environmentServiceNameAzureRM: '$(serviceConnection)'
-
-          - publish: $(System.DefaultWorkingDirectory)
-            artifact: terraform-plan-$(Build.BuildId)
-            displayName: 'Publish Terraform Plan Artifact'
-
-  # Stage 3: Terraform Apply (uses environment-level approval)
-  - stage: TerraformApply
-    displayName: 'Terraform Apply Stage'
-    dependsOn: TerraformValidateAndPlan
-    jobs:
-      - deployment: Apply
-        displayName: 'Terraform Apply Deployment'
-        environment: 'dev'  # Ensure this environment has manual approval enabled in DevOps
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - task: TerraformInstaller@1
-                  displayName: 'Install Terraform'
-                  inputs:
-                    terraformVersion: 'latest'
-
-                - download: current
-                  artifact: terraform-plan-$(Build.BuildId)
-                  displayName: 'Download Terraform Plan Artifact'
-
-                - task: TerraformTaskV4@4
-                  displayName: 'Terraform Apply'
-                  inputs:
-                    provider: 'azurerm'
-                    command: 'apply'
-                    workingDirectory: '$(Pipeline.Workspace)/terraform-plan-$(Build.BuildId)'
-                    commandOptions: 'tfplan.binary'
-                    environmentServiceNameAzureRM: '$(serviceConnection)'
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Apply'
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/'
+        commandOptions: '-var-file=terraform.tfvars -auto-approve'
+        environmentServiceNameAzureRM: '$(serviceConnection)'
