@@ -16,7 +16,7 @@ variables:
 
 # Backend configuration
 - name: backendAzureRmSubscriptionId
-  value: null # You can dynamically fetch or set this via Key Vault too
+  value: 18a0e420-4ca6-47f3-ba52-2534b3c7d2c1
 - name: backendAzureRmResourceGroupName
   value: backendrg01
 - name: backendAzureRmStorageAccountName
