@@ -5,7 +5,7 @@ variables:
 - group: TerraformBackendConfig  # Reference the variable group for backend variables
 
 pool:
-  vmImage: 'Default'
+  name: 'Default'
 
 stages:
 - stage: TerraformDeployment
