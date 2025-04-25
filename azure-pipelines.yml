@@ -2,14 +2,13 @@ trigger:
   - main
 
 variables:
-  - group: TerraformBackendConfig  # Backend config stored in variable group
+  - group: TerraformBackendConfig  # Backend config variable group
 
 pool:
   vmImage: 'ubuntu-latest'
 
 stages:
-
-  # Stage 1: Terraform Init
+  # Stage 1: Terraform Init (Module + Provider installation)
   - stage: TerraformInit
     displayName: 'Terraform Init Stage'
     jobs:
@@ -17,14 +16,14 @@ stages:
         displayName: 'Terraform Init Job'
         steps:
           - checkout: self
-          
+
           - task: TerraformInstaller@1
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: 'latest'
 
           - task: TerraformTaskV4@4
-            displayName: 'Terraform Init (Install Modules)'
+            displayName: 'Terraform Init'
             inputs:
               provider: 'azurerm'
               command: 'init'
@@ -38,9 +37,9 @@ stages:
 
           - publish: $(System.DefaultWorkingDirectory)/.terraform
             artifact: terraform-modules
-            displayName: 'Publish Terraform Modules'
+            displayName: 'Publish Terraform Modules Artifact'
 
-  # Stage 2: Terraform Validate & Plan
+  # Stage 2: Validate and Plan
   - stage: TerraformValidateAndPlan
     displayName: 'Terraform Validate & Plan Stage'
     dependsOn: TerraformInit
@@ -55,13 +54,27 @@ stages:
             displayName: 'Download Terraform Modules Artifact'
 
           - script: |
-              cp -r $(Pipeline.Workspace)/terraform-modules $(System.DefaultWorkingDirectory)/.terraform
-            displayName: 'Restore Terraform Modules'
+              mkdir -p .terraform
+              cp -r $(Pipeline.Workspace)/terraform-modules/* .terraform/
+            displayName: 'Restore .terraform Modules'
 
           - task: TerraformInstaller@1
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: 'latest'
+
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Init (for validation)'
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/'
+              environmentServiceNameAzureRM: '$(serviceConnection)'
+              backendServiceArm: '$(serviceConnection)'
+              backendAzureRmResourceGroupName: '$(backendResourceGroup)'
+              backendAzureRmStorageAccountName: '$(backendStorageAccount)'
+              backendAzureRmContainerName: '$(backendContainer)'
+              backendAzureRmKey: '$(backendStateFile)'
 
           - task: TerraformTaskV4@4
             displayName: 'Terraform Validate'
@@ -84,29 +97,24 @@ stages:
             artifact: terraform-plan-$(Build.BuildId)
             displayName: 'Publish Terraform Plan Artifact'
 
-  # Stage 3: Terraform Apply (Manual approval can be added later)
+  # Stage 3: Terraform Apply
   - stage: TerraformApply
     displayName: 'Terraform Apply Stage'
     dependsOn: TerraformValidateAndPlan
     jobs:
       - deployment: Apply
         displayName: 'Terraform Apply Deployment'
-        environment: 'dev'  # Define this in Azure DevOps Environments
+        environment: 'dev'  # Define this environment in Azure DevOps Environments
         strategy:
           runOnce:
             deploy:
               steps:
+                - checkout: self
+
                 - task: TerraformInstaller@1
                   displayName: 'Install Terraform'
                   inputs:
                     terraformVersion: 'latest'
-
-                # Optional: Add approval step before apply
-                # - task: ManualValidation@0
-                #   inputs:
-                #     notifyUsers: '["youruser@example.com"]'
-                #     instructions: 'Review plan and approve to apply'
-                #     timeoutInMinutes: 1440
 
                 - download: current
                   artifact: terraform-plan-$(Build.BuildId)
