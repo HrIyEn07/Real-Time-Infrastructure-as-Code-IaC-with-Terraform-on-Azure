@@ -2,13 +2,13 @@ trigger:
   - main
 
 variables:
-  - group: TerraformBackendConfig  # Backend config variable group
+  - group: TerraformBackendConfig  # Variable group containing serviceConnection, backendResourceGroup, etc.
 
 pool:
   vmImage: 'ubuntu-latest'
 
 stages:
-  # Stage 1: Terraform Init (Module + Provider installation)
+  # Stage 1: Terraform Init (Module + Provider Setup)
   - stage: TerraformInit
     displayName: 'Terraform Init Stage'
     jobs:
@@ -35,11 +35,7 @@ stages:
               backendAzureRmContainerName: '$(backendContainer)'
               backendAzureRmKey: '$(backendStateFile)'
 
-          - publish: $(System.DefaultWorkingDirectory)/.terraform
-            artifact: terraform-modules
-            displayName: 'Publish Terraform Modules Artifact'
-
-  # Stage 2: Validate and Plan
+  # Stage 2: Terraform Validate & Plan
   - stage: TerraformValidateAndPlan
     displayName: 'Terraform Validate & Plan Stage'
     dependsOn: TerraformInit
@@ -49,32 +45,10 @@ stages:
         steps:
           - checkout: self
 
-          - download: current
-            artifact: terraform-modules
-            displayName: 'Download Terraform Modules Artifact'
-
-          - script: |
-              mkdir -p .terraform
-              cp -r $(Pipeline.Workspace)/terraform-modules/* .terraform/
-            displayName: 'Restore .terraform Modules'
-
           - task: TerraformInstaller@1
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: 'latest'
-
-          - task: TerraformTaskV4@4
-            displayName: 'Terraform Init (for validation)'
-            inputs:
-              provider: 'azurerm'
-              command: 'init'
-              workingDirectory: '$(System.DefaultWorkingDirectory)/'
-              environmentServiceNameAzureRM: '$(serviceConnection)'
-              backendServiceArm: '$(serviceConnection)'
-              backendAzureRmResourceGroupName: '$(backendResourceGroup)'
-              backendAzureRmStorageAccountName: '$(backendStorageAccount)'
-              backendAzureRmContainerName: '$(backendContainer)'
-              backendAzureRmKey: '$(backendStateFile)'
 
           - task: TerraformTaskV4@4
             displayName: 'Terraform Validate'
@@ -97,14 +71,14 @@ stages:
             artifact: terraform-plan-$(Build.BuildId)
             displayName: 'Publish Terraform Plan Artifact'
 
-  # Stage 3: Terraform Apply
+  # Stage 3: Terraform Apply (with Init for provider permissions)
   - stage: TerraformApply
     displayName: 'Terraform Apply Stage'
     dependsOn: TerraformValidateAndPlan
     jobs:
       - deployment: Apply
         displayName: 'Terraform Apply Deployment'
-        environment: 'dev'  # Define this environment in Azure DevOps Environments
+        environment: 'dev'
         strategy:
           runOnce:
             deploy:
@@ -121,10 +95,23 @@ stages:
                   displayName: 'Download Terraform Plan Artifact'
 
                 - task: TerraformTaskV4@4
+                  displayName: 'Terraform Init (Reinitialize for Apply)'
+                  inputs:
+                    provider: 'azurerm'
+                    command: 'init'
+                    workingDirectory: '$(System.DefaultWorkingDirectory)/'
+                    environmentServiceNameAzureRM: '$(serviceConnection)'
+                    backendServiceArm: '$(serviceConnection)'
+                    backendAzureRmResourceGroupName: '$(backendResourceGroup)'
+                    backendAzureRmStorageAccountName: '$(backendStorageAccount)'
+                    backendAzureRmContainerName: '$(backendContainer)'
+                    backendAzureRmKey: '$(backendStateFile)'
+
+                - task: TerraformTaskV4@4
                   displayName: 'Terraform Apply'
                   inputs:
                     provider: 'azurerm'
                     command: 'apply'
-                    workingDirectory: '$(Pipeline.Workspace)/terraform-plan-$(Build.BuildId)'
+                    workingDirectory: '$(System.DefaultWorkingDirectory)/'
                     commandOptions: 'tfplan.binary'
                     environmentServiceNameAzureRM: '$(serviceConnection)'
