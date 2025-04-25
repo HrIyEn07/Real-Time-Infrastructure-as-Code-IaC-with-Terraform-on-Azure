@@ -1,0 +1,66 @@
+variables:
+- group: TerraformBackendConfig-dev
+
+# These variables are consistent across all environments but scoped by parameter
+- name: tfAction
+  value: ${{ parameters.tfAction }}
+
+- name: tfvarsFile
+  value: pipeline/env/${{ parameters.environment }}/terraform.${{ parameters.environment }}.tfvars
+
+- name: tfEnvironmentName
+  value: ${{ parameters.environment }}
+
+- name: serviceConnection
+  value: 'Azure DevOps Pulse(18a0e420-4ca6-47f3-ba52-2534b3c7d2c1)'
+
+# Backend configuration
+- name: backendAzureRmSubscriptionId
+  value: null # You can dynamically fetch or set this via Key Vault too
+- name: backendAzureRmResourceGroupName
+  value: backendrg01
+- name: backendAzureRmStorageAccountName
+  value: stpulsebackend01
+- name: backendAzureRmContainerName
+  value: container-${{ parameters.environment }}-eastus
+- name: backendAzureRmKey
+  value: terraform.${{ parameters.environment }}.tfstate
+
+# Secure files (if needed)
+- name: secureFiles
+  value: null
+
+# variables:
+#   - group: TerraformBackendConfig-dev
+
+#   - name: tfAction
+#     value: ${{ parameters.tfAction }}
+
+#   - name: tfvarsFile
+#     value: pipeline/env/dev/terraform.dev.tfvars
+
+#   - name: tfEnvironmentName
+#     value: dev
+
+#   - name: serviceConnection
+#     value: Azure DevOps Pulse(18a0e420-4ca6-47f3-ba52-2534b3c7d2c1)
+
+#   # Backend configuration
+#   - name: backendAzureRmSubscriptionId
+#     value: null
+
+#   - name: backendAzureRmResourceGroupName
+#     value: backendrg01
+
+#   - name: backendAzureRmStorageAccountName
+#     value: stpulsebackend01
+
+#   - name: backendAzureRmContainerName
+#     value: container-dev-eastus
+
+#   - name: backendAzureRmKey
+#     value: terraform.${{ parameters.environment }}.tfstate
+
+#   # Secure files
+#   - name: secureFiles
+#     value: null

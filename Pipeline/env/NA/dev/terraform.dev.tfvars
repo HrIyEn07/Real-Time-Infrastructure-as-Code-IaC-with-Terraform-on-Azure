@@ -7,18 +7,21 @@ environment = {
   }
 }
 
-resource_group = {
-  name = "devrg"
+common_resource_group = {
+  name = "com"
   location = "eastus"
-
 }
 
+
+resource_group = {
+  name = "storage"
+  location = "eatus"
+}
 
 network_rg = {
   name = "dev-networkrg"
   location = "eastus"
 }
-
 
 
 storage_accounts = {
@@ -33,17 +36,17 @@ storage_accounts = {
       { name = "logs" }
     ]
   },
-  stazuredevopspulse-02 = { 
-    name             = "stazuredevopspulse02"
-    tier             = "Standard"
-    replication_type = "ZRS"
-    enable_failover  = true
-    enable_backup    = false
-    containers = [
-      { name = "backup" },
-      { name = "archived" }
-    ]
-  },
+  # stazuredevopspulse-02 = { 
+  #   name             = "stazuredevopspulse02"
+  #   tier             = "Standard"
+  #   replication_type = "LRS"
+  #   enable_failover  = true
+  #   enable_backup    = false
+  #   containers = [
+  #     { name = "backup" },
+  #     { name = "archived" }
+  #   ]
+  # },
   
 }
 
@@ -117,12 +120,6 @@ network = {
 }
 
 
-# resource_group = {
-#   name = "devrg"
-#   id = null
-# }
-
-
 virtual_machines = {
   "windows" = {
     name                = "windowspulse100"
@@ -139,26 +136,28 @@ virtual_machines = {
     username = "adminuser"
     password = "password123!"
     public_ip = {
-      enabled = true
+      enabled = false
     }
   },
 
-  "linux" = {
-    name                = "Linuxpulse200"
-    resource_group_name = "rg-pulse"
-    type                = "linux"
-    vm_size             = "Standard_B1s"
-    disk_size_gb        = 127
-    image = {
-      publisher = "Canonical"
-      offer     = "UbuntuServer"
-      sku       = "22.04 LTS"
-      version   = "latest"
-    }
-    username = "adminuser"
-    password = "password123!"
-    public_ip = {
-      enabled = false
-    }
-  }
+  # "linux" = {
+  #   name                = "Linuxpulse200"
+  #   resource_group_name = "rg-pulse"
+  #   type                = "linux"
+  #   vm_size             = "Standard_B1s"
+  #   disk_size_gb        = 127
+  #   image = {
+  #     publisher = "Canonical"
+  #     offer     = "UbuntuServer"
+  #     sku       = "20_04-lts"
+  #     version   = "latest"
+  #   }
+  #   username = "adminuser"
+  #   password = "password123!"
+  #   public_ip = {
+  #     enabled = false
+  #   }
+  # }
 }
+
+

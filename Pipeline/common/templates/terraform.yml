@@ -1,0 +1,65 @@
+parameters:
+  environment: ''
+  tfAction: ''  # The action (validate, plan, apply, destroy)
+
+jobs:
+- job: TerraformJob
+  displayName: 'Terraform - ${{ parameters.tfAction }}'
+  steps:
+    - checkout: self
+
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: 'latest'
+
+    - task: TerraformTaskV4@4
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        backendServiceArm: $(serviceConnection)
+        backendAzureRmResourceGroupName: $(backendAzureRmResourceGroupName)
+        backendAzureRmStorageAccountName: $(backendAzureRmStorageAccountName)
+        backendAzureRmContainerName: $(backendAzureRmContainerName)
+        backendAzureRmKey: $(backendAzureRmKey)
+
+    # Conditional Validation Step
+    - ${{ if eq(parameters.tfAction, 'validate') }}:
+        - task: TerraformTaskV4@4
+          inputs:
+            provider: 'azurerm'
+            command: 'validate'
+            environmentServiceNameAzureRM: $(serviceConnection)
+
+    # Conditional Plan Step
+    - ${{ if eq(parameters.tfAction, 'plan') }}:
+        - task: TerraformTaskV4@4
+          inputs:
+            provider: 'azurerm'
+            command: 'plan'
+            environmentServiceNameAzureRM: $(serviceConnection)
+            vars: |
+              -var-file=$(tfvarsFile)
+
+    # Conditional Apply Step
+    - ${{ if eq(parameters.tfAction, 'apply') }}:
+        - task: TerraformTaskV4@4
+          inputs:
+            provider: 'azurerm'
+            command: 'apply'
+            environmentServiceNameAzureRM: $(serviceConnection)
+            vars: |
+              -var-file=$(tfvarsFile)
+            ensureBackend: true
+            additionalArgs: '-auto-approve'
+
+    # Conditional Destroy Step
+    - ${{ if eq(parameters.tfAction, 'destroy') }}:
+        - task: TerraformTaskV4@4
+          inputs:
+            provider: 'azurerm'
+            command: 'destroy'
+            environmentServiceNameAzureRM: $(serviceConnection)
+            vars: |
+              -var-file=$(tfvarsFile)
+            ensureBackend: true
+            additionalArgs: '-auto-approve'
