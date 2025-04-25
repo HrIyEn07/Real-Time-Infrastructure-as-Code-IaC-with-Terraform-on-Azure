@@ -6,7 +6,7 @@ trigger:
     - dev
 
 pool:
-  vmImage: 'ubuntu-latest'
+  name: 'Default'
 
 parameters:
 - name: environment
@@ -33,14 +33,16 @@ stages:
   displayName: "Terraform - ${{ parameters.tfAction }} - ${{ parameters.environment }}"
   condition: always()
   jobs:
-  - template: pipeline/common/templates/terraform.yml
+  - template: Pipeline/common/templates/terraform.yml
     parameters:
       environment: ${{ parameters.environment }}
       tfAction: ${{ parameters.tfAction }}
-  # Manual approvals for apply or destroy in staging/prod
-  # ${{ if and(
+  # # Manual approval for apply or destroy in staging/prod environments
+  # - ${{ if and(
   #       or(eq(parameters.tfAction, 'apply'), eq(parameters.tfAction, 'destroy'), eq(parameters.tfAction, 'plan & apply')),
   #       or(eq(parameters.environment, 'staging'), eq(parameters.environment, 'prod'))
   #     ) }}:
-  #   environment:
-  #     name: ${{ parameters.environment }}
+  #     - approval:
+  #         name: Manual Approval for ${{ parameters.tfAction }} in ${{ parameters.environment }}
+  #         timeout: 1.00:00:00
+  #         instructions: 'Please approve or reject the deployment for ${{ parameters.environment }}'

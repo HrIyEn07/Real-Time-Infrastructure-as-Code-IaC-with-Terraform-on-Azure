@@ -10,7 +10,7 @@ stages:
 - stage: Terraform_${{ parameters.environment }}
   displayName: "Terraform Stage - ${{ parameters.environment }}"
   jobs:
-    - template: common/templates/pipeline.yml
+    - template: Pipeline/common/templates/pipeline.yml
       parameters:
         environment: ${{ parameters.environment }}
         tfAction: ${{ parameters.tfAction }}
