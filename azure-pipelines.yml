@@ -1,0 +1,50 @@
+trigger:
+- main
+
+variables:
+- group: TerraformBackendConfig  # Reference the variable group for backend variables
+
+pool:
+  name: 'Default'
+
+stages:
+- stage: TerraformDeployment
+  jobs:
+  - job: DeployTerraform
+    steps:
+    - checkout: self
+
+    - task: TerraformInstaller@1
+      displayName: 'Install Terraform'
+      inputs:
+        terraformVersion: 'latest'
+
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Init'
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/'
+        backendServiceArm: '$(serviceConnection)'
+        backendAzureRmResourceGroupName: '$(backendResourceGroup)'
+        backendAzureRmStorageAccountName: '$(backendStorageAccount)'
+        backendAzureRmContainerName: '$(backendContainer)'
+        backendAzureRmKey: '$(backendStateFile)'
+
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Plan'
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/'
+        commandOptions: '-var-file=terraform.tfvars'
+        environmentServiceNameAzureRM: '$(serviceConnection)'
+
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Apply'
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/'
+        commandOptions: '-var-file=terraform.tfvars -auto-approve'
+        environmentServiceNameAzureRM: '$(serviceConnection)'
