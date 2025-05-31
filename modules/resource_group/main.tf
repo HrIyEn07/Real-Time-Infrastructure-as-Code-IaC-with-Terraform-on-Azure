@@ -4,4 +4,3 @@ resource "azurerm_resource_group" "common-rg" {
   location = var.environment.region.primary
   tags = var.tags
 }
-

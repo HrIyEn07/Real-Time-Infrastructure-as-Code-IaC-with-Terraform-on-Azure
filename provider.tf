@@ -6,10 +6,10 @@ terraform {
     }
   }
 
- backend "azurerm" {}
+ #backend "azurerm" {}
 }
 
 provider "azurerm" {
   features {}
-  # subscription_id = "" # optional if set in service connection
+  subscription_id = "18a0e420-4ca6-47f3-ba52-2534b3c7d2c1" # optional if set in service connection
 }

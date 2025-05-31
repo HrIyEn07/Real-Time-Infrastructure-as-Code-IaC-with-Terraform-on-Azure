@@ -1,9 +1,9 @@
-module "common_resource_group" {
-    source = "./modules/resource_group"
-    environment = var.environment
-    common_resource_group = var.common_resource_group
-    tags = var.tags
-}
+# module "common_resource_group" {
+#     source = "./modules/resource_group"
+#     environment = var.environment
+#     common_resource_group = var.common_resource_group
+#     tags = var.tags
+# }
 
 module "storage_accounts" {
   source = "./modules/storage_account"
